@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Tonic",
+  "description": "Organize Chromium tabs into LLM-generated groups with preview, protection, and undo.",
+  "version": "0.1.0",
+  "permissions": ["storage", "tabs", "tabGroups", "sidePanel"],
+  "host_permissions": ["https://openrouter.ai/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Tab Tonic"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

@@ -1,0 +1,577 @@
+import { useEffect, useMemo, useState } from "react";
+import { sendBackgroundMessage } from "../shared/messages";
+import { DEFAULT_SETTINGS, GROUP_COLORS } from "../shared/types";
+import type {
+  ExtensionSettings,
+  GenerateOrganizationPlanResult,
+  LoadTabsForPreviewResult,
+  RunScope
+} from "../shared/types";
+
+type Status =
+  | { kind: "idle"; message: string }
+  | { kind: "success"; message: string }
+  | { kind: "error"; message: string }
+  | { kind: "info"; message: string };
+
+function stringifyList(values: string[]) {
+  return values.join("\n");
+}
+
+function parseList(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function formatGroupLabel(group: LoadTabsForPreviewResult["liveGroups"][number]) {
+  const title = group.title.trim() || "Untitled group";
+  return `${title} · ${group.tabCount} tabs`;
+}
+
+function summarizePreview(preview: LoadTabsForPreviewResult | GenerateOrganizationPlanResult | null) {
+  if (!preview) {
+    return {
+      totalTabs: 0,
+      mutableTabs: 0,
+      protectedTabs: 0
+    };
+  }
+
+  return {
+    totalTabs: preview.tabs.length,
+    mutableTabs: preview.tabs.filter((tab) => !tab.isProtected).length,
+    protectedTabs: preview.tabs.filter((tab) => tab.isProtected).length
+  };
+}
+
+export function App() {
+  const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
+  const [defaultCategoriesText, setDefaultCategoriesText] = useState("");
+  const [protectedTitlesText, setProtectedTitlesText] = useState("");
+  const [scope, setScope] = useState<RunScope>("currentWindow");
+  const [runCategoriesText, setRunCategoriesText] = useState("");
+  const [previewContext, setPreviewContext] = useState<LoadTabsForPreviewResult | null>(null);
+  const [planResult, setPlanResult] = useState<GenerateOrganizationPlanResult | null>(null);
+  const [selectedProtectedGroupIds, setSelectedProtectedGroupIds] = useState<number[]>([]);
+  const [status, setStatus] = useState<Status>({
+    kind: "idle",
+    message: "Load tabs, generate a preview, then apply the grouped layout."
+  });
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [currentWindowId, setCurrentWindowId] = useState<number | undefined>();
+
+  const previewSummary = useMemo(
+    () => summarizePreview(planResult ?? previewContext),
+    [planResult, previewContext]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      try {
+        const window = await chrome.windows.getCurrent();
+        const loadedSettings = await sendBackgroundMessage({ type: "getSettings" });
+
+        if (cancelled) {
+          return;
+        }
+
+        setCurrentWindowId(window.id);
+        setSettings(loadedSettings);
+        setDefaultCategoriesText(stringifyList(loadedSettings.defaultCategories));
+        setProtectedTitlesText(stringifyList(loadedSettings.protectedGroupTitles));
+        setRunCategoriesText(stringifyList(loadedSettings.defaultCategories));
+
+        const initialPreview = await sendBackgroundMessage({
+          type: "loadTabsForPreview",
+          options: {
+            scope: "currentWindow",
+            categoriesMode: "hybrid",
+            currentWindowId: window.id
+          }
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setPreviewContext(initialPreview);
+        setSelectedProtectedGroupIds(initialPreview.selectedProtectedGroupIds);
+      } catch (error) {
+        if (!cancelled) {
+          setStatus({
+            kind: "error",
+            message: error instanceof Error ? error.message : "Failed to load the extension state."
+          });
+        }
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function refreshPreviewContext(nextScope = scope) {
+    setBusyAction("refresh");
+    setStatus({ kind: "info", message: "Refreshing live tabs and groups..." });
+
+    try {
+      const result = await sendBackgroundMessage({
+        type: "loadTabsForPreview",
+        options: {
+          scope: nextScope,
+          categoriesMode: "hybrid",
+          currentWindowId,
+          protectedGroupIdsOverride: selectedProtectedGroupIds,
+          protectedGroupTitlesOverride: parseList(protectedTitlesText)
+        }
+      });
+      setPreviewContext(result);
+      setPlanResult(null);
+      setSelectedProtectedGroupIds(result.selectedProtectedGroupIds);
+      setStatus({
+        kind: "success",
+        message:
+          result.warnings[0] ?? `Loaded ${result.tabs.length} tabs for ${nextScope === "allWindows" ? "all windows" : "the current window"}.`
+      });
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Failed to refresh tabs."
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleSaveSettings() {
+    setBusyAction("save");
+    setStatus({ kind: "info", message: "Saving settings..." });
+
+    try {
+      const nextSettings = await sendBackgroundMessage({
+        type: "saveSettings",
+        settings: {
+          openRouterApiKey: settings.openRouterApiKey,
+          modelId: settings.modelId,
+          defaultCategories: parseList(defaultCategoriesText),
+          protectedGroupTitles: parseList(protectedTitlesText)
+        }
+      });
+      setSettings(nextSettings);
+      setDefaultCategoriesText(stringifyList(nextSettings.defaultCategories));
+      setProtectedTitlesText(stringifyList(nextSettings.protectedGroupTitles));
+      setStatus({ kind: "success", message: "Settings saved locally on this browser." });
+      await refreshPreviewContext();
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Failed to save settings."
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleGeneratePreview() {
+    setBusyAction("generate");
+    setStatus({ kind: "info", message: "Generating an LLM preview..." });
+
+    try {
+      const result = await sendBackgroundMessage({
+        type: "generateOrganizationPlan",
+        options: {
+          scope,
+          categoriesMode: "hybrid",
+          currentWindowId,
+          runCategories: parseList(runCategoriesText),
+          protectedGroupIdsOverride: selectedProtectedGroupIds,
+          protectedGroupTitlesOverride: parseList(protectedTitlesText)
+        }
+      });
+      setPlanResult(result);
+      setPreviewContext(result);
+      setSelectedProtectedGroupIds(result.selectedProtectedGroupIds);
+      setStatus({
+        kind: "success",
+        message: result.warnings[0] ?? "Preview generated. Review categories before applying."
+      });
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Failed to generate a preview."
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleApplyPreview() {
+    if (!planResult) {
+      setStatus({ kind: "error", message: "Generate a preview before applying changes." });
+      return;
+    }
+
+    setBusyAction("apply");
+    setStatus({ kind: "info", message: "Applying grouped tab layout..." });
+
+    try {
+      const result = await sendBackgroundMessage({
+        type: "applyOrganizationPlan",
+        options: {
+          scope,
+          categoriesMode: "hybrid",
+          currentWindowId,
+          runCategories: parseList(runCategoriesText),
+          protectedGroupIdsOverride: selectedProtectedGroupIds,
+          protectedGroupTitlesOverride: parseList(protectedTitlesText)
+        },
+        plan: planResult.plan,
+        tabs: planResult.tabs
+      });
+
+      setStatus({
+        kind: "success",
+        message: result.warnings[0] ?? "Preview applied. Use undo to restore the previous layout."
+      });
+      setPlanResult(null);
+      await refreshPreviewContext();
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Failed to apply the preview."
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleUndo() {
+    setBusyAction("undo");
+    setStatus({ kind: "info", message: "Restoring the previous tab layout..." });
+
+    try {
+      const result = await sendBackgroundMessage({ type: "undoLastOrganization" });
+      setStatus({
+        kind: "success",
+        message: result.warnings[0] ?? "Previous layout restored."
+      });
+      setPlanResult(null);
+      await refreshPreviewContext();
+    } catch (error) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Undo failed."
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  const liveGroups = previewContext?.liveGroups ?? [];
+
+  return (
+    <main className="shell">
+      <header className="hero">
+        <div>
+          <p className="eyebrow">Chrome tab grouping via OpenRouter</p>
+          <h1>Tab Tonic</h1>
+          <p className="hero-copy">
+            Review a model-generated grouping plan before touching your browser.
+          </p>
+        </div>
+        <div className="hero-grid">
+          <article>
+            <strong>{previewSummary.totalTabs}</strong>
+            <span>Total tabs</span>
+          </article>
+          <article>
+            <strong>{previewSummary.mutableTabs}</strong>
+            <span>Mutable</span>
+          </article>
+          <article>
+            <strong>{previewSummary.protectedTabs}</strong>
+            <span>Protected</span>
+          </article>
+        </div>
+      </header>
+
+      <section className="status-card" data-kind={status.kind}>
+        <strong>{status.kind === "error" ? "Issue" : status.kind === "success" ? "Ready" : "Status"}</strong>
+        <p>{status.message}</p>
+      </section>
+
+      <section className="panel-grid">
+        <article className="panel">
+          <div className="section-title">
+            <h2>Settings</h2>
+            <button type="button" onClick={handleSaveSettings} disabled={busyAction !== null}>
+              {busyAction === "save" ? "Saving..." : "Save"}
+            </button>
+          </div>
+
+          <label>
+            <span>OpenRouter API key</span>
+            <input
+              type="password"
+              value={settings.openRouterApiKey}
+              placeholder="sk-or-v1-..."
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  openRouterApiKey: event.target.value
+                }))
+              }
+            />
+          </label>
+
+          <label>
+            <span>Model ID</span>
+            <input
+              type="text"
+              value={settings.modelId}
+              placeholder="anthropic/claude-3.7-sonnet"
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  modelId: event.target.value
+                }))
+              }
+            />
+          </label>
+
+          <label>
+            <span>Default categories</span>
+            <textarea
+              rows={4}
+              value={defaultCategoriesText}
+              placeholder={"Research\nWork\nShopping"}
+              onChange={(event) => setDefaultCategoriesText(event.target.value)}
+            />
+          </label>
+
+          <label>
+            <span>Saved protected group titles</span>
+            <textarea
+              rows={4}
+              value={protectedTitlesText}
+              placeholder={"Reading queue\nCurrent sprint"}
+              onChange={(event) => setProtectedTitlesText(event.target.value)}
+            />
+          </label>
+        </article>
+
+        <article className="panel">
+          <div className="section-title">
+            <h2>Run</h2>
+            <button
+              type="button"
+              onClick={() => void refreshPreviewContext()}
+              disabled={busyAction !== null}
+            >
+              {busyAction === "refresh" ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+
+          <div className="scope-picker">
+            <button
+              type="button"
+              className={scope === "currentWindow" ? "active" : ""}
+              onClick={() => {
+                setScope("currentWindow");
+                void refreshPreviewContext("currentWindow");
+              }}
+              disabled={busyAction !== null}
+            >
+              Current window
+            </button>
+            <button
+              type="button"
+              className={scope === "allWindows" ? "active" : ""}
+              onClick={() => {
+                setScope("allWindows");
+                void refreshPreviewContext("allWindows");
+              }}
+              disabled={busyAction !== null}
+            >
+              All windows
+            </button>
+          </div>
+
+          <label>
+            <span>Run categories override</span>
+            <textarea
+              rows={4}
+              value={runCategoriesText}
+              placeholder={"Leave empty for LLM-generated categories"}
+              onChange={(event) => setRunCategoriesText(event.target.value)}
+            />
+          </label>
+
+          <div className="action-row">
+            <button type="button" onClick={handleGeneratePreview} disabled={busyAction !== null}>
+              {busyAction === "generate" ? "Generating..." : "Generate preview"}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={handleApplyPreview}
+              disabled={busyAction !== null || !planResult}
+            >
+              {busyAction === "apply" ? "Applying..." : "Apply preview"}
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={handleUndo}
+              disabled={busyAction !== null}
+            >
+              {busyAction === "undo" ? "Undoing..." : "Undo"}
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section className="panel">
+        <div className="section-title">
+          <h2>Protected groups</h2>
+          <span className="helper-text">
+            Saved defaults match by title. Unnamed groups can be protected only for this run.
+          </span>
+        </div>
+
+        {previewContext?.ambiguousProtectedTitles.length ? (
+          <div className="warning-banner">
+            Resolve duplicate protected titles by selecting the exact live groups below:{" "}
+            {previewContext.ambiguousProtectedTitles.join(", ")}
+          </div>
+        ) : null}
+
+        <div className="group-list">
+          {liveGroups.length === 0 ? (
+            <p className="helper-text">No live tab groups found in the selected scope.</p>
+          ) : (
+            liveGroups.map((group) => {
+              const checked = selectedProtectedGroupIds.includes(group.groupId);
+
+              return (
+                <label key={group.groupId} className="group-item">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(event) => {
+                      setSelectedProtectedGroupIds((current) => {
+                        if (event.target.checked) {
+                          return Array.from(new Set([...current, group.groupId]));
+                        }
+
+                        return current.filter((groupId) => groupId !== group.groupId);
+                      });
+                    }}
+                  />
+                  <div>
+                    <strong>{formatGroupLabel(group)}</strong>
+                    <p>
+                      {group.color} {group.isAmbiguousDefault ? "· duplicate saved title" : ""}{" "}
+                      {group.canBeSaved ? "" : "· unnamed groups can only be protected per run"}
+                    </p>
+                  </div>
+                </label>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      <section className="panel preview-panel">
+        <div className="section-title">
+          <h2>Preview</h2>
+          <span className="helper-text">
+            {planResult ? "Review before applying." : "Generate a preview to inspect model output."}
+          </span>
+        </div>
+
+        {planResult ? (
+          <>
+            <div className="reasoning-card">
+              <strong>Model summary</strong>
+              <p>{planResult.plan.reasoningSummary}</p>
+            </div>
+
+            <div className="category-grid">
+              {planResult.plan.categories.map((category) => (
+                <article key={category.name} className="category-card">
+                  <header>
+                    <span
+                      className="color-chip"
+                      style={{
+                        background:
+                          {
+                            grey: "#67768d",
+                            blue: "#377dff",
+                            red: "#f04b68",
+                            yellow: "#d4a935",
+                            green: "#33a36b",
+                            pink: "#f46bb2",
+                            purple: "#8467e6",
+                            cyan: "#37a6c2",
+                            orange: "#db7b3f"
+                          }[category.color]
+                      }}
+                    />
+                    <div>
+                      <strong>{category.name}</strong>
+                      <p>
+                        {category.tabIds.length} tabs · native group color {category.color}
+                      </p>
+                    </div>
+                  </header>
+                  <ul>
+                    {category.tabIds.map((tabId) => {
+                      const tab = planResult.tabs.find((candidate) => candidate.tabId === tabId);
+
+                      return (
+                        <li key={tabId}>
+                          <span>{tab?.title ?? `Tab ${tabId}`}</span>
+                          <small>{tab?.domain || tab?.url || "No URL"}</small>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </article>
+              ))}
+            </div>
+
+            {planResult.plan.unassignedTabIds.length > 0 ? (
+              <div className="unassigned-card">
+                <strong>Left unassigned</strong>
+                <ul>
+                  {planResult.plan.unassignedTabIds.map((tabId) => {
+                    const tab = planResult.tabs.find((candidate) => candidate.tabId === tabId);
+
+                    return <li key={tabId}>{tab?.title ?? `Tab ${tabId}`}</li>;
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="empty-state">
+            <p>Preview cards will appear here after the model returns a valid grouping plan.</p>
+            <p className="helper-text">Available colors: {GROUP_COLORS.join(", ")}</p>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
