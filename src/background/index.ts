@@ -49,95 +49,105 @@ async function handleRequest(
     case "generateOrganizationPlan": {
       const settings = await getSettings();
       const runId = crypto.randomUUID();
-      await emitProgress({
-        phase: "loading_tabs",
-        message: "Starting preview generation...",
-        runId,
-        state: "running"
-      });
-      const previewContext = await collectPreviewContext(
-        request.options,
-        request.options.protectedGroupTitlesOverride ?? settings.protectedGroupTitles,
-        {
-          onLoadingTabs: (message) =>
+      try {
+        await emitProgress({
+          phase: "loading_tabs",
+          message: "Starting preview generation...",
+          runId,
+          state: "running"
+        });
+        const previewContext = await collectPreviewContext(
+          request.options,
+          request.options.protectedGroupTitlesOverride ?? settings.protectedGroupTitles,
+          {
+            onLoadingTabs: (message) =>
+              emitProgress({
+                phase: "loading_tabs",
+                message,
+                runId,
+                state: "running"
+              }),
+            onResolvingProtection: (message) =>
+              emitProgress({
+                phase: "resolving_protection",
+                message,
+                runId,
+                state: "running"
+              })
+          }
+        );
+        await emitProgress({
+          phase: "clustering_tabs",
+          message: `Loaded ${previewContext.tabs.length} tabs. Starting local clustering before model calls...`,
+          tabCount: previewContext.tabs.length,
+          runId,
+          state: "running"
+        });
+        await emitProgress({
+          phase: "building_prompt",
+          message: `Preparing a prompt for ${previewContext.tabs.filter((tab) => !tab.isProtected).length} mutable tabs...`,
+          runId,
+          state: "running"
+        });
+        const promptInput = buildPromptInput(
+          previewContext.tabs,
+          previewContext.selectedProtectedGroupIds,
+          previewContext.liveGroups,
+          request.options.runCategories?.length ? request.options.runCategories : settings.defaultCategories
+        );
+        const plan = await generatePlanWithOpenRouter(settings, promptInput, runId, {
+          onClusteringTabs: (update) =>
             emitProgress({
-              phase: "loading_tabs",
-              message,
-              runId,
-              state: "running"
+              phase: "clustering_tabs",
+              ...update
             }),
-          onResolvingProtection: (message) =>
+          onPlanningBatches: (update) =>
             emitProgress({
-              phase: "resolving_protection",
-              message,
-              runId,
-              state: "running"
+              phase: "planning_batches",
+              ...update
+            }),
+          onRequestingModel: (update) =>
+            emitProgress({
+              phase: "requesting_model",
+              ...update
+            }),
+          onWaitingForModel: (update) =>
+            emitProgress({
+              phase: "waiting_for_model",
+              ...update
+            }),
+          onParsingResponse: (update) =>
+            emitProgress({
+              phase: "parsing_response",
+              ...update
+            }),
+          onValidatingPlan: (update) =>
+            emitProgress({
+              phase: "validating_plan",
+              ...update
             })
-        }
-      );
-      await emitProgress({
-        phase: "clustering_tabs",
-        message: `Loaded ${previewContext.tabs.length} tabs. Starting local clustering before model calls...`,
-        tabCount: previewContext.tabs.length,
-        runId,
-        state: "running"
-      });
-      await emitProgress({
-        phase: "building_prompt",
-        message: `Preparing a prompt for ${previewContext.tabs.filter((tab) => !tab.isProtected).length} mutable tabs...`,
-        runId,
-        state: "running"
-      });
-      const promptInput = buildPromptInput(
-        previewContext.tabs,
-        previewContext.selectedProtectedGroupIds,
-        previewContext.liveGroups,
-        request.options.runCategories?.length ? request.options.runCategories : settings.defaultCategories
-      );
-      const plan = await generatePlanWithOpenRouter(settings, promptInput, runId, {
-        onClusteringTabs: (update) =>
-          emitProgress({
-            phase: "clustering_tabs",
-            ...update
-          }),
-        onPlanningBatches: (update) =>
-          emitProgress({
-            phase: "planning_batches",
-            ...update
-          }),
-        onRequestingModel: (update) =>
-          emitProgress({
-            phase: "requesting_model",
-            ...update
-          }),
-        onWaitingForModel: (update) =>
-          emitProgress({
-            phase: "waiting_for_model",
-            ...update
-          }),
-        onParsingResponse: (update) =>
-          emitProgress({
-            phase: "parsing_response",
-            ...update
-          }),
-        onValidatingPlan: (update) =>
-          emitProgress({
-            phase: "validating_plan",
-            ...update
-          })
-      });
-      const result: GenerateOrganizationPlanResult = {
-        ...previewContext,
-        plan
-      };
-      await emitProgress({
-        phase: "complete",
-        message: `Preview ready with ${plan.categories.length} categories.`,
-        runId,
-        state: "complete"
-      });
+        });
+        const result: GenerateOrganizationPlanResult = {
+          ...previewContext,
+          plan
+        };
+        await emitProgress({
+          phase: "complete",
+          message: `Preview ready with ${plan.categories.length} categories.`,
+          runId,
+          state: "complete"
+        });
 
-      return result;
+        return result;
+      } catch (error) {
+        await emitProgress({
+          phase: "error",
+          message: error instanceof Error ? error.message : "Unknown extension error.",
+          runId,
+          state: "failed"
+        });
+        throw error;
+      }
     }
 
     case "applyOrganizationPlan": {
@@ -201,10 +211,12 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, _sender, sendR
       sendResponse({ ok: true, data } satisfies BackgroundResponse<unknown>);
     })
     .catch(async (error) => {
-      await emitProgress({
-        phase: "error",
-        message: error instanceof Error ? error.message : "Unknown extension error."
-      });
+      if (request.type !== "generateOrganizationPlan") {
+        await emitProgress({
+          phase: "error",
+          message: error instanceof Error ? error.message : "Unknown extension error."
+        });
+      }
       sendResponse({
         ok: false,
         error: error instanceof Error ? error.message : "Unknown extension error."

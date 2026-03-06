@@ -37,6 +37,28 @@ interface OpenRouterMessage {
   content: string;
 }
 
+interface OpenRouterChoicePayload {
+  finish_reason?: unknown;
+  native_finish_reason?: unknown;
+  text?: unknown;
+  message?: unknown;
+}
+
+interface OpenRouterResponsePayload {
+  id?: unknown;
+  model?: unknown;
+  provider?: unknown;
+  error?: {
+    message?: unknown;
+  };
+  usage?: {
+    prompt_tokens?: unknown;
+    completion_tokens?: unknown;
+    total_tokens?: unknown;
+  };
+  choices?: OpenRouterChoicePayload[];
+}
+
 export interface ExecutionProfile {
   concurrency: number;
   timeoutMs: number;
@@ -177,6 +199,98 @@ function extractMessageContent(message: unknown): string {
   }
 
   return "";
+}
+
+function clipDiagnosticValue(value: string, limit = 160) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized;
+}
+
+function describeResponseMetadata(payload: OpenRouterResponsePayload) {
+  const choice = payload.choices?.[0];
+  const message =
+    choice?.message && typeof choice.message === "object"
+      ? (choice.message as {
+          content?: unknown;
+          refusal?: unknown;
+          parsed?: unknown;
+          tool_calls?: unknown[];
+        })
+      : undefined;
+  const details = [
+    typeof payload.provider === "string" ? `provider=${payload.provider}` : null,
+    typeof payload.model === "string" ? `model=${payload.model}` : null,
+    typeof choice?.finish_reason === "string"
+      ? `finish_reason=${choice.finish_reason}`
+      : null,
+    typeof choice?.native_finish_reason === "string"
+      ? `native_finish_reason=${choice.native_finish_reason}`
+      : null,
+    typeof payload.usage?.completion_tokens === "number"
+      ? `completion_tokens=${payload.usage.completion_tokens}`
+      : null,
+    typeof payload.usage?.prompt_tokens === "number"
+      ? `prompt_tokens=${payload.usage.prompt_tokens}`
+      : null,
+    message
+      ? `message_keys=${Object.keys(message)
+          .sort()
+          .join(",") || "none"}`
+      : null,
+    Array.isArray(message?.tool_calls) ? `tool_calls=${message.tool_calls.length}` : null,
+    typeof message?.refusal === "string" && message.refusal.trim()
+      ? `refusal="${clipDiagnosticValue(message.refusal)}"`
+      : null
+  ].filter(Boolean);
+
+  return details.length > 0 ? ` (${details.join(", ")})` : "";
+}
+
+function extractJsonCandidate(rawContent: string) {
+  const fencedMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+
+  const firstBrace = rawContent.indexOf("{");
+  const lastBrace = rawContent.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return rawContent.slice(firstBrace, lastBrace + 1).trim();
+  }
+
+  const firstBracket = rawContent.indexOf("[");
+  const lastBracket = rawContent.lastIndexOf("]");
+  if (firstBracket >= 0 && lastBracket > firstBracket) {
+    return rawContent.slice(firstBracket, lastBracket + 1).trim();
+  }
+
+  return rawContent.trim();
+}
+
+export function parseStructuredResponsePayload(payload: OpenRouterResponsePayload) {
+  const firstChoice = payload.choices?.[0];
+  const choiceText = typeof firstChoice?.text === "string" ? firstChoice.text : "";
+  const rawContent = extractMessageContent(firstChoice?.message) || choiceText;
+
+  if (!rawContent) {
+    const providerMessage =
+      typeof payload.error?.message === "string" && payload.error.message.trim()
+        ? ` Provider message: ${clipDiagnosticValue(payload.error.message)}.`
+        : "";
+    throw new Error(
+      `OpenRouter returned no structured content${describeResponseMetadata(payload)}.${providerMessage}`
+    );
+  }
+
+  const candidate = extractJsonCandidate(rawContent);
+
+  try {
+    return JSON.parse(candidate) as unknown;
+  } catch {
+    throw new Error(
+      `OpenRouter returned non-JSON structured content${describeResponseMetadata(payload)}. Response snippet: ${clipDiagnosticValue(candidate)}`
+    );
+  }
 }
 
 function buildProgressUpdate(
@@ -678,6 +792,8 @@ export function isTransientBatchError(error: Error) {
   const message = error.message.toLowerCase();
 
   return (
+    message.includes("no structured content") ||
+    message.includes("non-json structured content") ||
     message.includes("empty response") ||
     message.includes("invalid json") ||
     message.includes("timed out") ||
@@ -796,11 +912,7 @@ async function requestStructuredJson(
     throw new Error(`OpenRouter request failed (${response.status}): ${body}`);
   }
 
-  const payload = (await response.json()) as {
-    choices?: Array<{
-      message?: unknown;
-    }>;
-  };
+  const payload = (await response.json()) as OpenRouterResponsePayload;
 
   await emitRunProgress(progress?.onParsingResponse, controller, {
     message:
@@ -810,17 +922,7 @@ async function requestStructuredJson(
     ...metadata
   });
 
-  const rawContent = extractMessageContent(payload.choices?.[0]?.message);
-
-  if (!rawContent) {
-    throw new Error("OpenRouter returned an empty response.");
-  }
-
-  try {
-    return JSON.parse(rawContent) as unknown;
-  } catch {
-    throw new Error("OpenRouter returned invalid JSON.");
-  }
+  return parseStructuredResponsePayload(payload);
 }
 
 async function fetchWithTimeout(

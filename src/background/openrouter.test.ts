@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { PromptInput, TabCluster } from "./plan";
-import { PreviewRunController, isTransientBatchError, splitBatchForRetry } from "./openrouter";
+import {
+  PreviewRunController,
+  isTransientBatchError,
+  parseStructuredResponsePayload,
+  splitBatchForRetry
+} from "./openrouter";
 
 describe("openrouter adaptive recovery helpers", () => {
   it("classifies empty responses and timeouts as transient", () => {
     expect(isTransientBatchError(new Error("OpenRouter returned an empty response."))).toBe(true);
+    expect(isTransientBatchError(new Error("OpenRouter returned no structured content (finish_reason=stop)."))).toBe(true);
+    expect(isTransientBatchError(new Error("OpenRouter returned non-JSON structured content."))).toBe(true);
     expect(isTransientBatchError(new Error("OpenRouter batch timed out after 25 seconds."))).toBe(true);
     expect(isTransientBatchError(new Error("Category references an unknown tab."))).toBe(false);
   });
@@ -52,5 +59,41 @@ describe("openrouter adaptive recovery helpers", () => {
     expect(controller.state).toBe("failed");
     expect(first.signal.aborted).toBe(true);
     expect(second.signal.aborted).toBe(true);
+  });
+
+  it("parses fenced JSON when the provider wraps a structured response", () => {
+    const parsed = parseStructuredResponsePayload({
+      choices: [
+        {
+          message: {
+            content: '```json\n{"reasoningSummary":"ok","categories":[],"unassignedTabIds":[1]}\n```'
+          }
+        }
+      ]
+    });
+
+    expect(parsed).toEqual({
+      reasoningSummary: "ok",
+      categories: [],
+      unassignedTabIds: [1]
+    });
+  });
+
+  it("surfaces provider metadata when no structured content is present", () => {
+    expect(() =>
+      parseStructuredResponsePayload({
+        provider: "openrouter",
+        model: "anthropic/test-model",
+        choices: [
+          {
+            finish_reason: "stop",
+            native_finish_reason: "stop",
+            message: {
+              refusal: "I could not comply."
+            }
+          }
+        ]
+      })
+    ).toThrowError(/provider=openrouter.*refusal="I could not comply\."/i);
   });
 });
