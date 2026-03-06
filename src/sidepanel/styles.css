@@ -254,10 +254,36 @@ label span {
 .warning-banner,
 .reasoning-card,
 .unassigned-card,
-.empty-state {
+.empty-state,
+.activity-item {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.58);
   padding: 0.95rem 1rem;
+}
+
+.activity-log {
+  display: grid;
+  gap: 0.65rem;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.activity-item strong {
+  color: #7a5d42;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activity-meta {
+  display: block;
+  color: #617183;
+  font-size: 0.82rem;
+  margin-top: 0.18rem;
+}
+
+.activity-item p {
+  margin: 0.3rem 0 0;
 }
 
 .warning-banner {

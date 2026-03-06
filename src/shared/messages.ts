@@ -9,6 +9,32 @@ import type {
   UndoOrganizationResult
 } from "./types";
 
+export interface ProgressUpdate {
+  phase:
+    | "error"
+    | "clustering_tabs"
+    | "planning_batches"
+    | "loading_tabs"
+    | "resolving_protection"
+    | "building_prompt"
+    | "requesting_model"
+    | "waiting_for_model"
+    | "parsing_response"
+    | "validating_plan"
+    | "applying_plan"
+    | "undoing_plan"
+    | "complete";
+  message: string;
+  timestamp: string;
+  runId?: string;
+  state?: "running" | "retrying" | "degraded" | "failed" | "cancelled" | "complete";
+  currentBatch?: number;
+  totalBatches?: number;
+  tabCount?: number;
+  attempt?: number;
+  maxAttempts?: number;
+}
+
 export type BackgroundRequest =
   | { type: "getSettings" }
   | { type: "saveSettings"; settings: ExtensionSettings }
@@ -42,6 +68,11 @@ export interface BackgroundResponseMap {
   applyOrganizationPlan: ApplyOrganizationResult;
   undoLastOrganization: UndoOrganizationResult;
 }
+
+export type BackgroundEvent = {
+  type: "progressUpdate";
+  update: ProgressUpdate;
+};
 
 export async function sendBackgroundMessage<T extends keyof BackgroundResponseMap>(
   request: Extract<BackgroundRequest, { type: T }>

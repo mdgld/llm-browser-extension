@@ -81,10 +81,19 @@ export interface PreviewContextResult {
   warnings: string[];
 }
 
+type ProgressReporter = (message: string) => void | Promise<void>;
+
 export async function collectPreviewContext(
   options: OrganizeRunOptions,
-  savedProtectedTitles: string[]
+  savedProtectedTitles: string[],
+  progress?: {
+    onLoadingTabs?: ProgressReporter;
+    onResolvingProtection?: ProgressReporter;
+  }
 ): Promise<PreviewContextResult> {
+  await progress?.onLoadingTabs?.(
+    `Scanning ${options.scope === "allWindows" ? "all browser windows" : "the current window"} for tabs and groups...`
+  );
   const tabs = await loadTabsForScope(options);
   const groupMap = await getGroupMap(tabs);
   const liveGroupMap = new Map<number, LiveTabGroup>();
@@ -111,6 +120,9 @@ export async function collectPreviewContext(
     });
   }
 
+  await progress?.onResolvingProtection?.(
+    `Loaded ${tabs.length} tabs. Resolving protected group defaults and per-run overrides...`
+  );
   const resolvedProtection = resolveProtectedGroups({
     liveGroups: Array.from(liveGroupMap.values()),
     savedProtectedTitles,

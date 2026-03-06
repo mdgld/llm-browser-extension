@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { BackgroundEvent, ProgressUpdate } from "../shared/messages";
 import { sendBackgroundMessage } from "../shared/messages";
 import { DEFAULT_SETTINGS, GROUP_COLORS } from "../shared/types";
 import type {
@@ -50,6 +51,23 @@ function summarizePreview(preview: LoadTabsForPreviewResult | GenerateOrganizati
   };
 }
 
+function formatProgressMeta(entry: ProgressUpdate) {
+  const parts: string[] = [];
+
+  if (
+    typeof entry.currentBatch === "number" &&
+    typeof entry.totalBatches === "number"
+  ) {
+    parts.push(`batch ${entry.currentBatch}/${entry.totalBatches}`);
+  }
+
+  if (typeof entry.tabCount === "number") {
+    parts.push(`${entry.tabCount} tabs`);
+  }
+
+  return parts.join(" · ");
+}
+
 export function App() {
   const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
   const [defaultCategoriesText, setDefaultCategoriesText] = useState("");
@@ -65,6 +83,8 @@ export function App() {
   });
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [currentWindowId, setCurrentWindowId] = useState<number | undefined>();
+  const [progressLog, setProgressLog] = useState<ProgressUpdate[]>([]);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
   const previewSummary = useMemo(
     () => summarizePreview(planResult ?? previewContext),
@@ -121,9 +141,51 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const listener = (message: BackgroundEvent) => {
+      if (message?.type !== "progressUpdate") {
+        return;
+      }
+
+      if (message.update.runId) {
+        if (!activeRunId) {
+          setActiveRunId(message.update.runId);
+        } else if (message.update.runId !== activeRunId) {
+          return;
+        }
+      }
+
+      setProgressLog((current) => [...current.slice(-19), message.update]);
+      setStatus({
+        kind:
+          message.update.phase === "error" || message.update.state === "failed"
+            ? "error"
+            : message.update.phase === "complete" || message.update.state === "complete"
+              ? "success"
+              : "info",
+        message: message.update.message
+      });
+    };
+
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, [activeRunId]);
+
+  function beginTrackedAction(action: string, initialMessage: string) {
+    setBusyAction(action);
+    setActiveRunId(null);
+    setProgressLog([
+      {
+        phase: "loading_tabs",
+        message: initialMessage,
+        timestamp: new Date().toISOString()
+      }
+    ]);
+    setStatus({ kind: "info", message: initialMessage });
+  }
+
   async function refreshPreviewContext(nextScope = scope) {
-    setBusyAction("refresh");
-    setStatus({ kind: "info", message: "Refreshing live tabs and groups..." });
+    beginTrackedAction("refresh", "Refreshing live tabs and groups...");
 
     try {
       const result = await sendBackgroundMessage({
@@ -155,8 +217,7 @@ export function App() {
   }
 
   async function handleSaveSettings() {
-    setBusyAction("save");
-    setStatus({ kind: "info", message: "Saving settings..." });
+    beginTrackedAction("save", "Saving settings...");
 
     try {
       const nextSettings = await sendBackgroundMessage({
@@ -184,8 +245,7 @@ export function App() {
   }
 
   async function handleGeneratePreview() {
-    setBusyAction("generate");
-    setStatus({ kind: "info", message: "Generating an LLM preview..." });
+    beginTrackedAction("generate", "Generating an LLM preview...");
 
     try {
       const result = await sendBackgroundMessage({
@@ -222,8 +282,7 @@ export function App() {
       return;
     }
 
-    setBusyAction("apply");
-    setStatus({ kind: "info", message: "Applying grouped tab layout..." });
+    beginTrackedAction("apply", "Applying grouped tab layout...");
 
     try {
       const result = await sendBackgroundMessage({
@@ -257,8 +316,7 @@ export function App() {
   }
 
   async function handleUndo() {
-    setBusyAction("undo");
-    setStatus({ kind: "info", message: "Restoring the previous tab layout..." });
+    beginTrackedAction("undo", "Restoring the previous tab layout...");
 
     try {
       const result = await sendBackgroundMessage({ type: "undoLastOrganization" });
@@ -309,6 +367,30 @@ export function App() {
       <section className="status-card" data-kind={status.kind}>
         <strong>{status.kind === "error" ? "Issue" : status.kind === "success" ? "Ready" : "Status"}</strong>
         <p>{status.message}</p>
+      </section>
+
+      <section className="panel">
+        <div className="section-title">
+          <h2>Activity</h2>
+          <span className="helper-text">
+            Long preview runs report each stage here.
+          </span>
+        </div>
+        <div className="activity-log">
+          {progressLog.length === 0 ? (
+            <p className="helper-text">No activity yet.</p>
+          ) : (
+            progressLog.map((entry, index) => (
+              <div key={`${entry.timestamp}-${index}`} className="activity-item">
+                <strong>{new Date(entry.timestamp).toLocaleTimeString()}</strong>
+                {formatProgressMeta(entry) ? (
+                  <span className="activity-meta">{formatProgressMeta(entry)}</span>
+                ) : null}
+                <p>{entry.message}</p>
+              </div>
+            ))
+          )}
+        </div>
       </section>
 
       <section className="panel-grid">
