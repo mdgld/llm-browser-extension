@@ -33,6 +33,10 @@ export interface ProgressUpdate {
   tabCount?: number;
   attempt?: number;
   maxAttempts?: number;
+  /** Set on phase "complete" for generateOrganizationPlan so the side panel can apply the result without waiting for the message channel. */
+  result?: GenerateOrganizationPlanResult;
+  /** Set on phase "error" for generateOrganizationPlan to convey the final error. */
+  error?: string;
 }
 
 export type BackgroundRequest =
@@ -64,7 +68,8 @@ export interface BackgroundResponseMap {
   getSettings: ExtensionSettings;
   saveSettings: ExtensionSettings;
   loadTabsForPreview: LoadTabsForPreviewResult;
-  generateOrganizationPlan: GenerateOrganizationPlanResult;
+  /** Immediate response is { runId }; actual result is delivered via progressUpdate with update.result. */
+  generateOrganizationPlan: { runId: string };
   applyOrganizationPlan: ApplyOrganizationResult;
   undoLastOrganization: UndoOrganizationResult;
 }

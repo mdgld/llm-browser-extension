@@ -47,107 +47,8 @@ async function handleRequest(
     }
 
     case "generateOrganizationPlan": {
-      const settings = await getSettings();
       const runId = crypto.randomUUID();
-      try {
-        await emitProgress({
-          phase: "loading_tabs",
-          message: "Starting preview generation...",
-          runId,
-          state: "running"
-        });
-        const previewContext = await collectPreviewContext(
-          request.options,
-          request.options.protectedGroupTitlesOverride ?? settings.protectedGroupTitles,
-          {
-            onLoadingTabs: (message) =>
-              emitProgress({
-                phase: "loading_tabs",
-                message,
-                runId,
-                state: "running"
-              }),
-            onResolvingProtection: (message) =>
-              emitProgress({
-                phase: "resolving_protection",
-                message,
-                runId,
-                state: "running"
-              })
-          }
-        );
-        await emitProgress({
-          phase: "clustering_tabs",
-          message: `Loaded ${previewContext.tabs.length} tabs. Starting local clustering before model calls...`,
-          tabCount: previewContext.tabs.length,
-          runId,
-          state: "running"
-        });
-        await emitProgress({
-          phase: "building_prompt",
-          message: `Preparing a prompt for ${previewContext.tabs.filter((tab) => !tab.isProtected).length} mutable tabs...`,
-          runId,
-          state: "running"
-        });
-        const promptInput = buildPromptInput(
-          previewContext.tabs,
-          previewContext.selectedProtectedGroupIds,
-          previewContext.liveGroups,
-          request.options.runCategories?.length ? request.options.runCategories : settings.defaultCategories
-        );
-        const plan = await generatePlanWithOpenRouter(settings, promptInput, runId, {
-          onClusteringTabs: (update) =>
-            emitProgress({
-              phase: "clustering_tabs",
-              ...update
-            }),
-          onPlanningBatches: (update) =>
-            emitProgress({
-              phase: "planning_batches",
-              ...update
-            }),
-          onRequestingModel: (update) =>
-            emitProgress({
-              phase: "requesting_model",
-              ...update
-            }),
-          onWaitingForModel: (update) =>
-            emitProgress({
-              phase: "waiting_for_model",
-              ...update
-            }),
-          onParsingResponse: (update) =>
-            emitProgress({
-              phase: "parsing_response",
-              ...update
-            }),
-          onValidatingPlan: (update) =>
-            emitProgress({
-              phase: "validating_plan",
-              ...update
-            })
-        });
-        const result: GenerateOrganizationPlanResult = {
-          ...previewContext,
-          plan
-        };
-        await emitProgress({
-          phase: "complete",
-          message: `Preview ready with ${plan.categories.length} categories.`,
-          runId,
-          state: "complete"
-        });
-
-        return result;
-      } catch (error) {
-        await emitProgress({
-          phase: "error",
-          message: error instanceof Error ? error.message : "Unknown extension error.",
-          runId,
-          state: "failed"
-        });
-        throw error;
-      }
+      return { runId } as BackgroundResponseMap["generateOrganizationPlan"];
     }
 
     case "applyOrganizationPlan": {
@@ -199,6 +100,114 @@ async function handleRequest(
   }
 }
 
+/** Runs generateOrganizationPlan work and delivers result/error via progress so the message channel is not held open. */
+async function runGenerateOrganizationPlan(
+  request: Extract<BackgroundRequest, { type: "generateOrganizationPlan" }>
+): Promise<void> {
+  const runId = crypto.randomUUID();
+  const settings = await getSettings();
+
+  try {
+    await emitProgress({
+      phase: "loading_tabs",
+      message: "Starting preview generation...",
+      runId,
+      state: "running"
+    });
+    const previewContext = await collectPreviewContext(
+      request.options,
+      request.options.protectedGroupTitlesOverride ?? settings.protectedGroupTitles,
+      {
+        onLoadingTabs: (message) =>
+          emitProgress({
+            phase: "loading_tabs",
+            message,
+            runId,
+            state: "running"
+          }),
+        onResolvingProtection: (message) =>
+          emitProgress({
+            phase: "resolving_protection",
+            message,
+            runId,
+            state: "running"
+          })
+      }
+    );
+    await emitProgress({
+      phase: "clustering_tabs",
+      message: `Loaded ${previewContext.tabs.length} tabs. Starting local clustering before model calls...`,
+      tabCount: previewContext.tabs.length,
+      runId,
+      state: "running"
+    });
+    await emitProgress({
+      phase: "building_prompt",
+      message: `Preparing a prompt for ${previewContext.tabs.filter((tab) => !tab.isProtected).length} mutable tabs...`,
+      runId,
+      state: "running"
+    });
+    const promptInput = buildPromptInput(
+      previewContext.tabs,
+      previewContext.selectedProtectedGroupIds,
+      previewContext.liveGroups,
+      request.options.runCategories?.length ? request.options.runCategories : settings.defaultCategories
+    );
+    const plan = await generatePlanWithOpenRouter(settings, promptInput, runId, {
+      onClusteringTabs: (update) =>
+        emitProgress({
+          phase: "clustering_tabs",
+          ...update
+        }),
+      onPlanningBatches: (update) =>
+        emitProgress({
+          phase: "planning_batches",
+          ...update
+        }),
+      onRequestingModel: (update) =>
+        emitProgress({
+          phase: "requesting_model",
+          ...update
+        }),
+      onWaitingForModel: (update) =>
+        emitProgress({
+          phase: "waiting_for_model",
+          ...update
+        }),
+      onParsingResponse: (update) =>
+        emitProgress({
+          phase: "parsing_response",
+          ...update
+        }),
+      onValidatingPlan: (update) =>
+        emitProgress({
+          phase: "validating_plan",
+          ...update
+        })
+    });
+    const result: GenerateOrganizationPlanResult = {
+      ...previewContext,
+      plan
+    };
+    await emitProgress({
+      phase: "complete",
+      message: `Preview ready with ${plan.categories.length} categories.`,
+      runId,
+      state: "complete",
+      result
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown extension error.";
+    await emitProgress({
+      phase: "error",
+      message,
+      runId,
+      state: "failed",
+      error: message
+    });
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -206,17 +215,31 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onMessage.addListener((request: BackgroundRequest, _sender, sendResponse) => {
+  // #region agent log
+  const _reqType = request?.type;
+  const _start = Date.now();
+  fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage',message:'listener entered',data:{requestType:_reqType,startMs:_start},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   handleRequest(request)
     .then((data) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage.then',message:'about to sendResponse success',data:{requestType:_reqType,elapsedMs:Date.now()-_start},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       sendResponse({ ok: true, data } satisfies BackgroundResponse<unknown>);
     })
     .catch(async (error) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage.catch',message:'in catch before emitProgress',data:{requestType:_reqType,elapsedMs:Date.now()-_start,errorMsg:error?.message},hypothesisId:'H3',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (request.type !== "generateOrganizationPlan") {
         await emitProgress({
           phase: "error",
           message: error instanceof Error ? error.message : "Unknown extension error."
         });
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage.catch',message:'about to sendResponse error',data:{requestType:_reqType,elapsedMs:Date.now()-_start},hypothesisId:'H5',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       sendResponse({
         ok: false,
         error: error instanceof Error ? error.message : "Unknown extension error."
