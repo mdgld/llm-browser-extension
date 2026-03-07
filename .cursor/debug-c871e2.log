@@ -1,0 +1,149 @@
+{"sessionId":"c871e2","location":"background/index.ts:onMessage","message":"listener entered","data":{"requestType":"getSettings","startMs":1772844499145},"hypothesisId":"H1","timestamp":1772844499145}
+{"sessionId":"c871e2","location":"background/index.ts:onMessage.then","message":"about to sendResponse success","data":{"requestType":"getSettings","elapsedMs":3},"hypothesisId":"H2","timestamp":1772844499148}
+{"sessionId":"c871e2","location":"background/index.ts:onMessage","message":"listener entered","data":{"requestType":"loadTabsForPreview","startMs":1772844499149},"hypothesisId":"H1","timestamp":1772844499149}
+{"sessionId":"c871e2","location":"background/index.ts:onMessage.then","message":"about to sendResponse success","data":{"requestType":"loadTabsForPreview","elapsedMs":188},"hypothesisId":"H2","timestamp":1772844499337}
+{"sessionId":"c871e2","location":"background/index.ts:onMessage","message":"listener entered","data":{"requestType":"loadTabsForPreview","startMs":1772844501807},"hypothesisId":"H1","timestamp":1772844501807}
+{"sessionId":"c871e2","location":"background/index.ts:onMessage.then","message":"about to sendResponse success","data":{"requestType":"loadTabsForPreview","elapsedMs":191},"hypothesisId":"H2","timestamp":1772844501998}
+{"sessionId":"c871e2","location":"background/index.ts:onMessage","message":"listener entered","data":{"requestType":"generateOrganizationPlan","startMs":1772844502978},"hypothesisId":"H1","timestamp":1772844502978}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":1,"total":40},"hypothesisId":"batch","timestamp":1772844503203}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":2,"total":40},"hypothesisId":"batch","timestamp":1772844503203}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":3,"total":40},"hypothesisId":"batch","timestamp":1772844503203}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":4,"total":40},"hypothesisId":"batch","timestamp":1772844503203}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":1,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503204}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503204}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":2,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503204}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503204}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":3,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503204}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503204}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":4,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503205}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844503205}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":4,"ok":true},"hypothesisId":"fetch","timestamp":1772844503656}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":2,"ok":true},"hypothesisId":"fetch","timestamp":1772844503663}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":1,"ok":true},"hypothesisId":"fetch","timestamp":1772844503672}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":3,"ok":true},"hypothesisId":"fetch","timestamp":1772844503749}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":3},"hypothesisId":"fetch","timestamp":1772844511184}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":3,"total":40},"hypothesisId":"batch","timestamp":1772844511186}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":5,"total":40},"hypothesisId":"batch","timestamp":1772844511191}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":5,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844511192}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844511192}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":5,"ok":true},"hypothesisId":"fetch","timestamp":1772844511858}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":1},"hypothesisId":"fetch","timestamp":1772844519713}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":1,"total":40},"hypothesisId":"batch","timestamp":1772844519714}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":6,"total":40},"hypothesisId":"batch","timestamp":1772844519720}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":6,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844519720}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844519720}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":6,"ok":true},"hypothesisId":"fetch","timestamp":1772844519868}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":2},"hypothesisId":"fetch","timestamp":1772844521033}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":2,"total":40},"hypothesisId":"batch","timestamp":1772844521033}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":7,"total":40},"hypothesisId":"batch","timestamp":1772844521038}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":7,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844521039}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844521039}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":4},"hypothesisId":"fetch","timestamp":1772844522838}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":4,"total":40},"hypothesisId":"batch","timestamp":1772844522841}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":8,"total":40},"hypothesisId":"batch","timestamp":1772844522854}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":8,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844522855}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844522856}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":8,"ok":true},"hypothesisId":"fetch","timestamp":1772844523006}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":7,"ok":true},"hypothesisId":"fetch","timestamp":1772844523175}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":8},"hypothesisId":"fetch","timestamp":1772844531446}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":8,"total":40},"hypothesisId":"batch","timestamp":1772844531447}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":9,"total":40},"hypothesisId":"batch","timestamp":1772844531450}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":9,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844531451}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844531451}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":9,"ok":true},"hypothesisId":"fetch","timestamp":1772844532556}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":5},"hypothesisId":"fetch","timestamp":1772844536147}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":5,"total":40},"hypothesisId":"batch","timestamp":1772844536148}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":10,"total":40},"hypothesisId":"batch","timestamp":1772844536154}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":10,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844536154}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844536154}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":10,"ok":true},"hypothesisId":"fetch","timestamp":1772844536331}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":7},"hypothesisId":"fetch","timestamp":1772844537971}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":7,"total":40},"hypothesisId":"batch","timestamp":1772844537972}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":11,"total":40},"hypothesisId":"batch","timestamp":1772844537981}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":11,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844537984}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844537985}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":11,"ok":true},"hypothesisId":"fetch","timestamp":1772844538149}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":10},"hypothesisId":"fetch","timestamp":1772844552059}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":10,"total":40},"hypothesisId":"batch","timestamp":1772844552060}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":12,"total":40},"hypothesisId":"batch","timestamp":1772844552064}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":12,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844552065}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844552065}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":12,"ok":true},"hypothesisId":"fetch","timestamp":1772844552223}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":6},"hypothesisId":"fetch","timestamp":1772844552681}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":6,"total":40},"hypothesisId":"batch","timestamp":1772844552682}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":13,"total":40},"hypothesisId":"batch","timestamp":1772844552687}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":13,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844552688}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844552688}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":11},"hypothesisId":"fetch","timestamp":1772844555243}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":13,"ok":true},"hypothesisId":"fetch","timestamp":1772844555243}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":11,"total":40},"hypothesisId":"batch","timestamp":1772844555825}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":14,"total":40},"hypothesisId":"batch","timestamp":1772844555836}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":14,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844555839}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844555839}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":14,"ok":true},"hypothesisId":"fetch","timestamp":1772844556078}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":12},"hypothesisId":"fetch","timestamp":1772844569596}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":12,"total":40},"hypothesisId":"batch","timestamp":1772844569599}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":15,"total":40},"hypothesisId":"batch","timestamp":1772844569613}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":15,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844569616}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844569617}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":15,"ok":true},"hypothesisId":"fetch","timestamp":1772844570665}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":9},"hypothesisId":"fetch","timestamp":1772844588717}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":9,"total":40},"hypothesisId":"batch","timestamp":1772844588719}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":16,"total":40},"hypothesisId":"batch","timestamp":1772844588722}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":16,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844588725}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844588725}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":16,"ok":true},"hypothesisId":"fetch","timestamp":1772844588946}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":15},"hypothesisId":"fetch","timestamp":1772844599521}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":15,"total":40},"hypothesisId":"batch","timestamp":1772844599522}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":17,"total":40},"hypothesisId":"batch","timestamp":1772844599525}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":17,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844599526}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844599526}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":17,"ok":true},"hypothesisId":"fetch","timestamp":1772844599669}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":16},"hypothesisId":"fetch","timestamp":1772844615416}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":16,"total":40},"hypothesisId":"batch","timestamp":1772844615416}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":18,"total":40},"hypothesisId":"batch","timestamp":1772844615422}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":18,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844615423}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844615423}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":18,"ok":true},"hypothesisId":"fetch","timestamp":1772844615829}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":17},"hypothesisId":"fetch","timestamp":1772844624101}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":17,"total":40},"hypothesisId":"batch","timestamp":1772844624101}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":19,"total":40},"hypothesisId":"batch","timestamp":1772844624106}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":19,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844624107}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844624107}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":19,"ok":true},"hypothesisId":"fetch","timestamp":1772844625346}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":19},"hypothesisId":"fetch","timestamp":1772844645810}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":19,"total":40},"hypothesisId":"batch","timestamp":1772844645811}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":20,"total":40},"hypothesisId":"batch","timestamp":1772844645823}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":20,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844645826}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844645827}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":20,"ok":true},"hypothesisId":"fetch","timestamp":1772844646164}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":20},"hypothesisId":"fetch","timestamp":1772844657793}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":20,"total":40},"hypothesisId":"batch","timestamp":1772844657795}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":21,"total":40},"hypothesisId":"batch","timestamp":1772844657812}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":21,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844657813}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844657813}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":21,"ok":true},"hypothesisId":"fetch","timestamp":1772844658368}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":21},"hypothesisId":"fetch","timestamp":1772844677546}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":21,"total":40},"hypothesisId":"batch","timestamp":1772844677548}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":22,"total":40},"hypothesisId":"batch","timestamp":1772844677565}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":22,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844677566}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844677567}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":22,"ok":true},"hypothesisId":"fetch","timestamp":1772844677946}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":22},"hypothesisId":"fetch","timestamp":1772844691177}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":22,"total":40},"hypothesisId":"batch","timestamp":1772844691178}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":23,"total":40},"hypothesisId":"batch","timestamp":1772844691183}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":23,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844691184}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844691184}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":23,"ok":true},"hypothesisId":"fetch","timestamp":1772844691328}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":23},"hypothesisId":"fetch","timestamp":1772844703411}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":23,"total":40},"hypothesisId":"batch","timestamp":1772844703414}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":24,"total":40},"hypothesisId":"batch","timestamp":1772844703430}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":24,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844703431}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844703431}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":24,"ok":true},"hypothesisId":"fetch","timestamp":1772844703733}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"response.json() done","data":{"batch":24},"hypothesisId":"fetch","timestamp":1772844723602}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch requestStructuredJson returned","data":{"batch":24,"total":40},"hypothesisId":"batch","timestamp":1772844723604}
+{"sessionId":"c871e2","location":"openrouter.ts:runBatch","message":"runBatch start","data":{"batch":25,"total":40},"hypothesisId":"batch","timestamp":1772844723617}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout starting","data":{"batch":25,"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844723618}
+{"sessionId":"c871e2","location":"openrouter.ts:fetchWithTimeout","message":"fetch() calling","data":{"timeoutMs":25000},"hypothesisId":"fetch","timestamp":1772844723618}
+{"sessionId":"c871e2","location":"openrouter.ts:requestStructuredJson","message":"fetchWithTimeout returned","data":{"batch":25,"ok":true},"hypothesisId":"fetch","timestamp":1772844724037}
