@@ -22,7 +22,7 @@ async function emitProgress(update: Omit<ProgressUpdate, "timestamp">) {
   };
 
   try {
-    await chrome.runtime.sendMessage(event);
+    chrome.runtime.sendMessage(event).catch(() => {});
   } catch {
     // Ignore when no side panel is actively listening.
   }
@@ -102,9 +102,9 @@ async function handleRequest(
 
 /** Runs generateOrganizationPlan work and delivers result/error via progress so the message channel is not held open. */
 async function runGenerateOrganizationPlan(
-  request: Extract<BackgroundRequest, { type: "generateOrganizationPlan" }>
+  request: Extract<BackgroundRequest, { type: "generateOrganizationPlan" }>,
+  runId: string
 ): Promise<void> {
-  const runId = crypto.randomUUID();
   const settings = await getSettings();
 
   try {
@@ -215,31 +215,24 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onMessage.addListener((request: BackgroundRequest, _sender, sendResponse) => {
-  // #region agent log
-  const _reqType = request?.type;
-  const _start = Date.now();
-  fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage',message:'listener entered',data:{requestType:_reqType,startMs:_start},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
+  if (request.type === "generateOrganizationPlan") {
+    const runId = crypto.randomUUID();
+    sendResponse({ ok: true, data: { runId } } as BackgroundResponse<{ runId: string }>);
+    void runGenerateOrganizationPlan(request, runId);
+    return false;
+  }
+
   handleRequest(request)
     .then((data) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage.then',message:'about to sendResponse success',data:{requestType:_reqType,elapsedMs:Date.now()-_start},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       sendResponse({ ok: true, data } satisfies BackgroundResponse<unknown>);
     })
     .catch(async (error) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage.catch',message:'in catch before emitProgress',data:{requestType:_reqType,elapsedMs:Date.now()-_start,errorMsg:error?.message},hypothesisId:'H3',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (request.type !== "generateOrganizationPlan") {
         await emitProgress({
           phase: "error",
           message: error instanceof Error ? error.message : "Unknown extension error."
         });
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7466/ingest/11db4304-76af-49bb-bbd9-ddea8707b724',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c871e2'},body:JSON.stringify({sessionId:'c871e2',location:'background/index.ts:onMessage.catch',message:'about to sendResponse error',data:{requestType:_reqType,elapsedMs:Date.now()-_start},hypothesisId:'H5',timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       sendResponse({
         ok: false,
         error: error instanceof Error ? error.message : "Unknown extension error."

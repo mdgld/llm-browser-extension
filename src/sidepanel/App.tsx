@@ -165,6 +165,24 @@ export function App() {
               : "info",
         message: message.update.message
       });
+
+      if (message.update.result) {
+        setPlanResult(message.update.result);
+        setPreviewContext(message.update.result);
+        setSelectedProtectedGroupIds(message.update.result.selectedProtectedGroupIds);
+        setStatus({
+          kind: "success",
+          message:
+            message.update.result.warnings[0] ?? "Preview generated. Review categories before applying."
+        });
+        setBusyAction(null);
+      }
+      if (
+        (message.update.phase === "error" || message.update.state === "failed") &&
+        message.update.runId === activeRunId
+      ) {
+        setBusyAction(null);
+      }
     };
 
     chrome.runtime.onMessage.addListener(listener);
@@ -248,7 +266,7 @@ export function App() {
     beginTrackedAction("generate", "Generating an LLM preview...");
 
     try {
-      const result = await sendBackgroundMessage({
+      const { runId } = await sendBackgroundMessage({
         type: "generateOrganizationPlan",
         options: {
           scope,
@@ -259,19 +277,12 @@ export function App() {
           protectedGroupTitlesOverride: parseList(protectedTitlesText)
         }
       });
-      setPlanResult(result);
-      setPreviewContext(result);
-      setSelectedProtectedGroupIds(result.selectedProtectedGroupIds);
-      setStatus({
-        kind: "success",
-        message: result.warnings[0] ?? "Preview generated. Review categories before applying."
-      });
+      setActiveRunId(runId);
     } catch (error) {
       setStatus({
         kind: "error",
         message: error instanceof Error ? error.message : "Failed to generate a preview."
       });
-    } finally {
       setBusyAction(null);
     }
   }

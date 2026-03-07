@@ -79,6 +79,10 @@ const MAX_PROTECTED_DOMAINS = 4;
 const MAX_REFINED_CATEGORY_SAMPLES = 4;
 const MAX_REFINED_CATEGORY_DOMAINS = 4;
 const MAX_BATCHES = 80;
+/** Per-batch cap so the model does not emit hundreds of micro-categories when auto-generating. */
+const MAX_CATEGORIES_PER_BATCH = 12;
+/** Refinement step should merge down to a small number of broad groups. */
+const MAX_FINAL_CATEGORIES = 15;
 
 const PLAN_SCHEMA = {
   type: "object",
@@ -92,6 +96,7 @@ const PLAN_SCHEMA = {
     },
     categories: {
       type: "array",
+      maxItems: MAX_CATEGORIES_PER_BATCH,
       items: {
         type: "object",
         additionalProperties: false,
@@ -120,6 +125,7 @@ const REFINEMENT_SCHEMA = {
     reasoningSummary: { type: "string" },
     categories: {
       type: "array",
+      maxItems: MAX_FINAL_CATEGORIES,
       items: {
         type: "object",
         additionalProperties: false,
@@ -267,14 +273,17 @@ export function clusterTabs(tabs: TabContext[]): TabCluster[] {
 }
 
 function buildBatchPromptPayload(input: PromptInput, batch: BatchPlan) {
+  const categoryGuidance =
+    input.preferredCategories.length > 0
+      ? `Prefer these category names when they fit: ${input.preferredCategories.join(", ")}.`
+      : `Invent at most ${MAX_CATEGORIES_PER_BATCH} concise, broad category names (e.g. Work, Research, Shopping, Social, Entertainment, Reference). Use 5–10 categories when possible; do not create many narrow categories.`;
+
   return {
     instructions: [
       "Use every mutable tab at most once.",
       "Put tabs that do not fit in unassignedTabIds.",
       "Keep categories broad enough to avoid one-tab groups unless necessary.",
-      input.preferredCategories.length > 0
-        ? `Prefer these category names when they fit: ${input.preferredCategories.join(", ")}.`
-        : "Invent concise category names when no user categories fit cleanly."
+      categoryGuidance
     ],
     protectedGroups: input.protectedGroups,
     clusters: batch.clusters.map((cluster) => ({
@@ -644,6 +653,7 @@ export function buildRefinementPrompt(provisionalCategories: ProvisionalCategory
     {
       instructions: [
         "You may merge provisional categories, rename them, or leave them separate.",
+        `Produce at most ${MAX_FINAL_CATEGORIES} final categories. Merge aggressively so the result has 8–15 broad groups (e.g. Work, Research, Shopping, Social), not dozens or hundreds.`,
         "Each provisional category must appear in exactly one final category.",
         "Do not invent or drop provisionalCategoryIds.",
         "Prefer semantically precise names over generic names like Work or Misc unless the content truly matches."

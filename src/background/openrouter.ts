@@ -151,54 +151,80 @@ function extractMessageContent(message: unknown): string {
     return "";
   }
 
-  const record = message as {
-    content?: unknown;
-    parsed?: unknown;
-    tool_calls?: Array<{
-      function?: {
-        arguments?: unknown;
-      };
-    }>;
-  };
+  const record = message as Record<string, unknown>;
   const content = record.content;
+  const reasoning = record.reasoning;
 
   if (typeof content === "string") {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
+    if (content.trim()) return content;
+  } else if (Array.isArray(content)) {
+    const joined = content
       .map((part) => {
-        if (typeof part === "string") {
-          return part;
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          const p = part as Record<string, unknown>;
+          if (typeof p.text === "string") return p.text;
+          if (typeof p.content === "string") return p.content;
+          if (typeof p.output === "string") return p.output;
+          if (typeof p.output_text === "string") return p.output_text;
         }
-
-        if (part && typeof part === "object" && "text" in part) {
-          return String((part as { text?: unknown }).text ?? "");
-        }
-
         return "";
       })
       .join("");
+    if (joined.trim()) return joined;
+  } else if (content && typeof content === "object") {
+    const c = content as Record<string, unknown>;
+    if (typeof c.text === "string" && c.text.trim()) return c.text;
+    if (typeof c.parts === "string" && c.parts.trim()) return c.parts;
   }
 
-  if (record.parsed) {
+  if (record.parsed && typeof record.parsed === "object") {
     return JSON.stringify(record.parsed);
   }
 
   const toolCallArguments = record.tool_calls
     ?.map((toolCall) => {
-      const args = toolCall.function?.arguments;
+      const args = (toolCall as { function?: { arguments?: unknown } })?.function?.arguments;
       return typeof args === "string" ? args : "";
     })
     .filter(Boolean)
     .join("\n");
+  if (toolCallArguments) return toolCallArguments;
 
-  if (toolCallArguments) {
-    return toolCallArguments;
+  if (typeof reasoning === "string" && reasoning.trim()) return reasoning.trim();
+  if (Array.isArray(reasoning)) {
+    const joined = reasoning
+      .map((part) => (typeof part === "string" ? part : ""))
+      .join("");
+    if (joined.trim()) return joined;
+  } else if (reasoning && typeof reasoning === "object") {
+    const r = reasoning as Record<string, unknown>;
+    if (typeof r.content === "string" && r.content.trim()) return r.content;
+    if (typeof r.text === "string" && r.text.trim()) return r.text;
   }
 
-  return "";
+  const reasoningDetails = record.reasoning_details;
+  if (typeof reasoningDetails === "string" && reasoningDetails.trim()) return reasoningDetails.trim();
+  if (reasoningDetails && typeof reasoningDetails === "object") {
+    const rd = reasoningDetails as Record<string, unknown>;
+    if (typeof rd.content === "string" && rd.content.trim()) return rd.content;
+    if (typeof rd.text === "string" && rd.text.trim()) return rd.text;
+  }
+
+  /* Last resort: collect any string value in the message that looks like JSON. */
+  let best = "";
+  for (const key of Object.keys(record)) {
+    const v = record[key];
+    if (typeof v === "string" && v.trim().includes("{") && v.length > best.length) best = v;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const o = v as Record<string, unknown>;
+      for (const k of Object.keys(o)) {
+        const s = o[k];
+        if (typeof s === "string" && s.trim().includes("{") && s.length > best.length) best = s;
+      }
+    }
+  }
+  return best;
 }
 
 function clipDiagnosticValue(value: string, limit = 160) {
@@ -269,16 +295,54 @@ function extractJsonCandidate(rawContent: string) {
 
 export function parseStructuredResponsePayload(payload: OpenRouterResponsePayload) {
   const firstChoice = payload.choices?.[0];
+  const msg = firstChoice?.message as Record<string, unknown> | undefined;
+
+  function isStructuredPlan(obj: unknown): obj is Record<string, unknown> {
+    return (
+      obj !== null &&
+      typeof obj === "object" &&
+      !Array.isArray(obj) &&
+      "categories" in obj
+    );
+  }
+
+  if (msg && isStructuredPlan(msg.parsed)) {
+    return msg.parsed as unknown;
+  }
+  const pl = payload as Record<string, unknown>;
+  if (isStructuredPlan(pl.output)) return pl.output as unknown;
+  if (isStructuredPlan(pl.result)) return pl.result as unknown;
+  if (isStructuredPlan(pl.parsed)) return pl.parsed as unknown;
+
+  if (msg && typeof msg.content === "object" && msg.content !== null && !Array.isArray(msg.content)) {
+    const c = msg.content as Record<string, unknown>;
+    if (isStructuredPlan(c)) return c as unknown;
+    if (isStructuredPlan(c.output)) return c.output as unknown;
+    if (isStructuredPlan(c.result)) return c.result as unknown;
+  }
+
   const choiceText = typeof firstChoice?.text === "string" ? firstChoice.text : "";
   const rawContent = extractMessageContent(firstChoice?.message) || choiceText;
 
   if (!rawContent) {
+    const msg = firstChoice?.message as Record<string, unknown> | undefined;
+    const parts: string[] = [];
+    if (msg) {
+      if (msg.content !== undefined)
+        parts.push(`content=${typeof msg.content}${Array.isArray(msg.content) ? `(array ${msg.content.length})` : typeof msg.content === "string" ? `(len=${msg.content.length})` : ""}`);
+      if (msg.reasoning !== undefined)
+        parts.push(`reasoning=${typeof msg.reasoning}${typeof msg.reasoning === "string" ? `(len=${msg.reasoning.length})` : ""}`);
+      if (msg.reasoning_details !== undefined) parts.push(`reasoning_details=${typeof msg.reasoning_details}`);
+    } else {
+      parts.push("no message");
+    }
+    const debug = parts.length ? parts.join(" ") : "unknown";
     const providerMessage =
       typeof payload.error?.message === "string" && payload.error.message.trim()
         ? ` Provider message: ${clipDiagnosticValue(payload.error.message)}.`
         : "";
     throw new Error(
-      `OpenRouter returned no structured content${describeResponseMetadata(payload)}.${providerMessage}`
+      `OpenRouter returned no structured content${describeResponseMetadata(payload)}. [${debug}]${providerMessage}`
     );
   }
 
@@ -605,10 +669,11 @@ async function runBatch(
   });
 
   try {
-    return validateOrganizationPlan(
+    const out = validateOrganizationPlan(
       parsed,
       task.batch.tabs.map((tab) => tab.tabId)
     );
+    return out;
   } catch {
     await emitRunProgress(progress?.onValidatingPlan, controller, {
       message: `Batch ${task.currentBatch}/${task.totalBatches}: model returned invalid tab references, repairing the plan locally...`,
@@ -617,7 +682,7 @@ async function runBatch(
       tabCount: task.batch.tabs.length,
       attempt: task.attempt,
       maxAttempts: task.maxAttempts
-    });
+    }    );
 
     return sanitizeOrganizationPlan(
       parsed,
