@@ -10,6 +10,7 @@ import {
   getRefinementSchema,
   materializeRefinedPlan,
   sanitizeOrganizationPlan,
+  tryRepairIndexBasedPlan,
   validateOrganizationPlan,
   validateRefinedCategoryPlan
 } from "./plan";
@@ -23,6 +24,9 @@ import type {
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const INITIAL_BATCH_TIMEOUT_MS = 25_000;
 const REFINEMENT_TIMEOUT_MS = 15_000;
+const MAX_PROVISIONAL_FOR_REFINEMENT = 100;
+const REFINEMENT_TIMEOUT_MAX_MS = 90_000;
+const REFINEMENT_TIMEOUT_PER_CATEGORY_MS = 200;
 const INITIAL_BATCH_CONCURRENCY = 4;
 const MAX_BATCH_CHAIN_ATTEMPTS = 4;
 const MAX_SPLIT_DEPTH = 2;
@@ -446,7 +450,22 @@ export async function generatePlanWithOpenRouter(
   });
 
   const provisionalCategories = buildProvisionalCategories(batchResults, input.mutableTabs);
-  const refinement = await runRefinement(settings, provisionalCategories, controller, progress);
+  const refinementSubset =
+    provisionalCategories.length <= MAX_PROVISIONAL_FOR_REFINEMENT
+      ? provisionalCategories
+      : [...provisionalCategories]
+          .sort((a, b) => b.tabCount - a.tabCount)
+          .slice(0, MAX_PROVISIONAL_FOR_REFINEMENT);
+
+  const refinement = await runRefinement(settings, refinementSubset, controller, progress);
+
+  if (provisionalCategories.length > MAX_PROVISIONAL_FOR_REFINEMENT && refinement.categories.length > 0) {
+    const subsetIds = new Set(refinementSubset.map((p) => p.provisionalCategoryId));
+    const orphanIds = provisionalCategories
+      .filter((p) => !subsetIds.has(p.provisionalCategoryId))
+      .map((p) => p.provisionalCategoryId);
+    refinement.categories[0].provisionalCategoryIds.push(...orphanIds);
+  }
 
   controller.markState("complete");
   return materializeRefinedPlan(
@@ -675,19 +694,22 @@ async function runBatch(
     );
     return out;
   } catch {
+    const mutableTabIds = task.batch.tabs.map((tab) => tab.tabId);
+    const repaired = tryRepairIndexBasedPlan(parsed, mutableTabIds);
+    if (repaired !== null) {
+      return repaired;
+    }
+
     await emitRunProgress(progress?.onValidatingPlan, controller, {
-      message: `Batch ${task.currentBatch}/${task.totalBatches}: model returned invalid tab references, repairing the plan locally...`,
+      message: `Batch ${task.currentBatch}/${task.totalBatches}: correcting tab IDs and continuing.`,
       currentBatch: task.currentBatch,
       totalBatches: task.totalBatches,
       tabCount: task.batch.tabs.length,
       attempt: task.attempt,
       maxAttempts: task.maxAttempts
-    }    );
+    });
 
-    return sanitizeOrganizationPlan(
-      parsed,
-      task.batch.tabs.map((tab) => tab.tabId)
-    );
+    return sanitizeOrganizationPlan(parsed, mutableTabIds);
   }
 }
 
@@ -884,9 +906,16 @@ async function runRefinement(
     { role: "user", content: userPrompt }
   ];
   const startedAt = performance.now();
+  const timeoutMs = Math.min(
+    REFINEMENT_TIMEOUT_MAX_MS,
+    REFINEMENT_TIMEOUT_MS + provisionalCategories.length * REFINEMENT_TIMEOUT_PER_CATEGORY_MS
+  );
 
   await emitRunProgress(progress?.onRequestingModel, controller, {
-    message: `Final refinement: reconciling ${provisionalCategories.length} provisional categories...`,
+    message:
+      provisionalCategories.length > 50
+        ? `Final refinement: reconciling ${provisionalCategories.length} provisional categories… (may take up to ${Math.round(timeoutMs / 1000)}s)`
+        : `Final refinement: reconciling ${provisionalCategories.length} provisional categories...`,
     tabCount: provisionalCategories.reduce((sum, category) => sum + category.tabCount, 0),
     state: "running"
   });
@@ -898,7 +927,7 @@ async function runRefinement(
       schema: getRefinementSchema()
     },
     messages,
-    REFINEMENT_TIMEOUT_MS,
+    timeoutMs,
     controller,
     {
       tabCount: provisionalCategories.reduce((sum, category) => sum + category.tabCount, 0),

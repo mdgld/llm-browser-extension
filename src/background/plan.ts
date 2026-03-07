@@ -117,6 +117,21 @@ const PLAN_SCHEMA = {
   }
 } as const;
 
+/** Coerce a value to an integer tab ID for validation; returns null if invalid. */
+function toIntegerTabId(value: unknown): number | null {
+  if (typeof value === "number") {
+    if (Number.isNaN(value) || !Number.isFinite(value)) return null;
+    const n = Math.round(value);
+    return n >= 0 ? n : null;
+  }
+  if (typeof value === "string") {
+    const n = parseInt(value.trim(), 10);
+    if (Number.isNaN(n)) return null;
+    return n >= 0 ? n : null;
+  }
+  return null;
+}
+
 const REFINEMENT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -273,6 +288,7 @@ export function clusterTabs(tabs: TabContext[]): TabCluster[] {
 }
 
 function buildBatchPromptPayload(input: PromptInput, batch: BatchPlan) {
+  const validTabIds = [...batch.tabs].map((t) => t.tabId).sort((a, b) => a - b);
   const categoryGuidance =
     input.preferredCategories.length > 0
       ? `Prefer these category names when they fit: ${input.preferredCategories.join(", ")}.`
@@ -283,8 +299,10 @@ function buildBatchPromptPayload(input: PromptInput, batch: BatchPlan) {
       "Use every mutable tab at most once.",
       "Put tabs that do not fit in unassignedTabIds.",
       "Keep categories broad enough to avoid one-tab groups unless necessary.",
+      "Every tabId in categories and unassignedTabIds MUST be exactly one of the numbers in validTabIds below. Do not use 1, 2, 3 or any other numbers—only the tabId values from mutableTabs.",
       categoryGuidance
     ],
+    validTabIds,
     protectedGroups: input.protectedGroups,
     clusters: batch.clusters.map((cluster) => ({
       clusterId: cluster.clusterId,
@@ -499,8 +517,9 @@ export function validateOrganizationPlan(
       throw new Error(`Category ${index + 1} is missing a name or tab list.`);
     }
 
-    const normalizedTabIds = tabIds.map((tabId) => {
-      if (typeof tabId !== "number" || !mutableIdSet.has(tabId)) {
+    const normalizedTabIds = tabIds.map((rawId) => {
+      const tabId = toIntegerTabId(rawId);
+      if (tabId === null || !mutableIdSet.has(tabId)) {
         throw new Error(`Category "${name}" references an unknown tab.`);
       }
 
@@ -519,8 +538,9 @@ export function validateOrganizationPlan(
     };
   });
 
-  const normalizedUnassigned = unassigned.map((tabId) => {
-    if (typeof tabId !== "number" || !mutableIdSet.has(tabId)) {
+  const normalizedUnassigned = unassigned.map((rawId) => {
+    const tabId = toIntegerTabId(rawId);
+    if (tabId === null || !mutableIdSet.has(tabId)) {
       throw new Error("Unassigned tabs contain an unknown tab.");
     }
 
@@ -543,6 +563,104 @@ export function validateOrganizationPlan(
     unassignedTabIds: Array.from(new Set(normalizedUnassigned)),
     reasoningSummary: reasoningSummary.trim() || "Tabs grouped by topic."
   };
+}
+
+/**
+ * If the model returned 1-based or 0-based indices instead of real tab IDs,
+ * map them to the batch's tab IDs and return a valid plan. Otherwise return null.
+ */
+export function tryRepairIndexBasedPlan(
+  candidate: unknown,
+  mutableTabIds: number[]
+): OrganizationPlan | null {
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  const raw = candidate as Record<string, unknown>;
+  const categories = Array.isArray(raw.categories) ? raw.categories : [];
+  const unassigned = Array.isArray(raw.unassignedTabIds) ? raw.unassignedTabIds : [];
+  const reasoningSummary =
+    typeof raw.reasoningSummary === "string" ? raw.reasoningSummary.trim() : "Tabs grouped by topic.";
+
+  const realTabIds = [...mutableTabIds].sort((a, b) => a - b);
+  const N = realTabIds.length;
+  if (N === 0) return null;
+
+  const collected: number[] = [];
+  for (const category of categories) {
+    if (!category || typeof category !== "object") continue;
+    const tabIds = (category as Record<string, unknown>).tabIds;
+    if (!Array.isArray(tabIds)) continue;
+    for (const rawId of tabIds) {
+      const id = toIntegerTabId(rawId);
+      if (id !== null) collected.push(id);
+    }
+  }
+  for (const rawId of unassigned) {
+    const id = toIntegerTabId(rawId);
+    if (id !== null) collected.push(id);
+  }
+
+  const modelIdSet = new Set(collected);
+  if (modelIdSet.size !== N) return null;
+
+  let indexMap: Map<number, number> | null = null;
+  const oneBased = new Set(Array.from({ length: N }, (_, i) => i + 1));
+  const zeroBased = new Set(Array.from({ length: N }, (_, i) => i));
+  if (setsEqual(modelIdSet, oneBased)) {
+    indexMap = new Map(Array.from({ length: N }, (_, i) => [i + 1, realTabIds[i]]));
+  } else if (setsEqual(modelIdSet, zeroBased)) {
+    indexMap = new Map(Array.from({ length: N }, (_, i) => [i, realTabIds[i]]));
+  }
+  if (!indexMap) return null;
+
+  const mapId = (id: number): number => indexMap!.get(id) ?? id;
+
+  const repairedCategories = categories
+    .filter((c): c is Record<string, unknown> => c != null && typeof c === "object")
+    .map((category) => {
+      const name = typeof category.name === "string" ? category.name.trim() : "";
+      const color = typeof category.color === "string" ? category.color : "grey";
+      const tabIds = Array.isArray(category.tabIds) ? category.tabIds : [];
+      const mapped = tabIds
+        .map((rawId) => toIntegerTabId(rawId))
+        .filter((id): id is number => id !== null)
+        .map(mapId);
+      if (!name || mapped.length === 0) return null;
+      return {
+        name,
+        color: normalizeColor(color, name),
+        tabIds: mapped
+      };
+    })
+    .filter((c): c is { name: string; color: GroupColor; tabIds: number[] } => c !== null);
+
+  const repairedUnassigned = unassigned
+    .map((rawId) => toIntegerTabId(rawId))
+    .filter((id): id is number => id !== null)
+    .map(mapId);
+
+  try {
+    return validateOrganizationPlan(
+      {
+        categories: repairedCategories,
+        unassignedTabIds: repairedUnassigned,
+        reasoningSummary
+      },
+      mutableTabIds
+    );
+  } catch {
+    return null;
+  }
+}
+
+function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const x of a) {
+    if (!b.has(x)) return false;
+  }
+  return true;
 }
 
 export function sanitizeOrganizationPlan(
@@ -578,7 +696,8 @@ export function sanitizeOrganizationPlan(
       }
 
       const normalizedTabIds = tabIds
-        .filter((tabId): tabId is number => typeof tabId === "number" && mutableIdSet.has(tabId))
+        .map((rawId) => toIntegerTabId(rawId))
+        .filter((tabId): tabId is number => tabId !== null && mutableIdSet.has(tabId))
         .filter((tabId) => {
           if (seenAssignments.has(tabId)) {
             return false;
@@ -601,7 +720,8 @@ export function sanitizeOrganizationPlan(
     .filter((category): category is OrganizationCategory => Boolean(category));
 
   const normalizedUnassigned = unassigned
-    .filter((tabId): tabId is number => typeof tabId === "number" && mutableIdSet.has(tabId))
+    .map((rawId) => toIntegerTabId(rawId))
+    .filter((tabId): tabId is number => tabId !== null && mutableIdSet.has(tabId))
     .filter((tabId) => !seenAssignments.has(tabId));
 
   for (const tabId of mutableIdSet) {
@@ -612,7 +732,7 @@ export function sanitizeOrganizationPlan(
 
   return {
     categories: normalizedCategories,
-    unassignedTabIds: normalizedUnassigned.sort((left, right) => left - right),
+    unassignedTabIds: Array.from(new Set(normalizedUnassigned)).sort((left, right) => left - right),
     reasoningSummary
   };
 }

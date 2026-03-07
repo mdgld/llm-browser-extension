@@ -85,6 +85,7 @@ export function App() {
   const [currentWindowId, setCurrentWindowId] = useState<number | undefined>();
   const [progressLog, setProgressLog] = useState<ProgressUpdate[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [pendingRefresh, setPendingRefresh] = useState(false);
 
   const previewSummary = useMemo(
     () => summarizePreview(planResult ?? previewContext),
@@ -93,6 +94,10 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Hold a port to the background service worker so Chrome doesn't suspend it
+    // while the side panel is open (MV3 workers die after ~30s otherwise).
+    const keepalivePort = chrome.runtime.connect({ name: "sidepanel-keepalive" });
 
     const bootstrap = async () => {
       try {
@@ -138,8 +143,20 @@ export function App() {
 
     return () => {
       cancelled = true;
+      keepalivePort.disconnect();
     };
   }, []);
+
+  // Trigger a preview refresh after apply/undo complete (delivered via progress events).
+  useEffect(() => {
+    if (!pendingRefresh) {
+      return;
+    }
+
+    setPendingRefresh(false);
+    void refreshPreviewContext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRefresh]);
 
   useEffect(() => {
     const listener = (message: BackgroundEvent) => {
@@ -166,6 +183,7 @@ export function App() {
         message: message.update.message
       });
 
+      // Generate preview: result arrives embedded in the progress event.
       if (message.update.result) {
         setPlanResult(message.update.result);
         setPreviewContext(message.update.result);
@@ -180,6 +198,31 @@ export function App() {
       if (
         (message.update.phase === "error" || message.update.state === "failed") &&
         message.update.runId === activeRunId
+      ) {
+        setBusyAction(null);
+      }
+
+      // Apply / undo: results arrive via progress "complete" (no runId on these runs).
+      if (
+        message.update.phase === "complete" &&
+        !message.update.runId
+      ) {
+        setBusyAction((current) => {
+          if (current === "apply") {
+            setPlanResult(null);
+            setPendingRefresh(true);
+          } else if (current === "undo") {
+            setPlanResult(null);
+            setPendingRefresh(true);
+          }
+          return null;
+        });
+      }
+
+      // Apply / undo error: clear busy state.
+      if (
+        (message.update.phase === "error" || message.update.state === "failed") &&
+        !message.update.runId
       ) {
         setBusyAction(null);
       }
@@ -296,7 +339,9 @@ export function App() {
     beginTrackedAction("apply", "Applying grouped tab layout...");
 
     try {
-      const result = await sendBackgroundMessage({
+      // sendBackgroundMessage now returns an immediate ack ({}).
+      // The real progress and completion come through progressUpdate events.
+      await sendBackgroundMessage({
         type: "applyOrganizationPlan",
         options: {
           scope,
@@ -309,19 +354,11 @@ export function App() {
         plan: planResult.plan,
         tabs: planResult.tabs
       });
-
-      setStatus({
-        kind: "success",
-        message: result.warnings[0] ?? "Preview applied. Use undo to restore the previous layout."
-      });
-      setPlanResult(null);
-      await refreshPreviewContext();
     } catch (error) {
       setStatus({
         kind: "error",
         message: error instanceof Error ? error.message : "Failed to apply the preview."
       });
-    } finally {
       setBusyAction(null);
     }
   }
@@ -330,19 +367,14 @@ export function App() {
     beginTrackedAction("undo", "Restoring the previous tab layout...");
 
     try {
-      const result = await sendBackgroundMessage({ type: "undoLastOrganization" });
-      setStatus({
-        kind: "success",
-        message: result.warnings[0] ?? "Previous layout restored."
-      });
-      setPlanResult(null);
-      await refreshPreviewContext();
+      // sendBackgroundMessage now returns an immediate ack ({}).
+      // The real progress and completion come through progressUpdate events.
+      await sendBackgroundMessage({ type: "undoLastOrganization" });
     } catch (error) {
       setStatus({
         kind: "error",
         message: error instanceof Error ? error.message : "Undo failed."
       });
-    } finally {
       setBusyAction(null);
     }
   }

@@ -1,12 +1,10 @@
 import type {
-  ApplyOrganizationResult,
   ExtensionSettings,
   GenerateOrganizationPlanResult,
   LoadTabsForPreviewResult,
   OrganizationPlan,
   OrganizeRunOptions,
-  TabContext,
-  UndoOrganizationResult
+  TabContext
 } from "./types";
 
 export interface ProgressUpdate {
@@ -37,6 +35,8 @@ export interface ProgressUpdate {
   result?: GenerateOrganizationPlanResult;
   /** Set on phase "error" for generateOrganizationPlan to convey the final error. */
   error?: string;
+  /** Set on phase "complete" for applyOrganizationPlan / undoLastOrganization to surface any warnings without keeping the message channel open. */
+  warnings?: string[];
 }
 
 export type BackgroundRequest =
@@ -70,8 +70,10 @@ export interface BackgroundResponseMap {
   loadTabsForPreview: LoadTabsForPreviewResult;
   /** Immediate response is { runId }; actual result is delivered via progressUpdate with update.result. */
   generateOrganizationPlan: { runId: string };
-  applyOrganizationPlan: ApplyOrganizationResult;
-  undoLastOrganization: UndoOrganizationResult;
+  /** Immediate empty ack; actual result/errors are delivered via progressUpdate (phase "complete" / "error"). */
+  applyOrganizationPlan: Record<string, never>;
+  /** Immediate empty ack; actual result/errors are delivered via progressUpdate (phase "complete" / "error"). */
+  undoLastOrganization: Record<string, never>;
 }
 
 export type BackgroundEvent = {

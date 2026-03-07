@@ -51,52 +51,78 @@ async function handleRequest(
       return { runId } as BackgroundResponseMap["generateOrganizationPlan"];
     }
 
-    case "applyOrganizationPlan": {
-      const settings = await getSettings();
-      await emitProgress({
-        phase: "applying_plan",
-        message: "Validating the preview against current browser state before applying..."
-      });
-      await validateApplyInput(
-        request.options,
-        request.tabs.filter((tab) => !tab.isProtected).map((tab) => tab.tabId),
-        request.options.protectedGroupTitlesOverride ?? settings.protectedGroupTitles
-      );
-      await emitProgress({
-        phase: "applying_plan",
-        message: `Applying ${request.plan.categories.length} category groups to the browser...`
-      });
-      const { warnings, snapshot } = await applyOrganizationPlan(request.options, request.plan);
-      await saveLastOperation(snapshot);
-      await emitProgress({
-        phase: "complete",
-        message: warnings[0] ?? "Apply finished."
-      });
+    // applyOrganizationPlan and undoLastOrganization are handled as fire-and-forget
+    // runners below to avoid holding the message channel open while the service
+    // worker does async work (which causes "message channel closed" errors).
+    case "applyOrganizationPlan":
+    case "undoLastOrganization":
+      return {} as never;
+  }
+}
 
-      return {
-        warnings
-      };
+/** Runs applyOrganizationPlan work and delivers result/error via progress so the message channel is not held open. */
+async function runApplyOrganizationPlan(
+  request: Extract<BackgroundRequest, { type: "applyOrganizationPlan" }>
+): Promise<void> {
+  try {
+    const settings = await getSettings();
+    await emitProgress({
+      phase: "applying_plan",
+      message: "Validating the preview against current browser state before applying..."
+    });
+    await validateApplyInput(
+      request.options,
+      request.tabs.filter((tab) => !tab.isProtected).map((tab) => tab.tabId),
+      request.options.protectedGroupTitlesOverride ?? settings.protectedGroupTitles
+    );
+    await emitProgress({
+      phase: "applying_plan",
+      message: `Applying ${request.plan.categories.length} category groups to the browser...`
+    });
+    const { warnings, snapshot } = await applyOrganizationPlan(request.options, request.plan);
+    await saveLastOperation(snapshot);
+    await emitProgress({
+      phase: "complete",
+      message: warnings[0] ?? "Apply finished.",
+      warnings
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown extension error.";
+    await emitProgress({
+      phase: "error",
+      message,
+      error: message
+    });
+  }
+}
+
+/** Runs undoLastOrganization work and delivers result/error via progress so the message channel is not held open. */
+async function runUndoLastOrganization(): Promise<void> {
+  try {
+    const snapshot = await getLastOperation();
+
+    if (!snapshot) {
+      throw new Error("Nothing to undo yet.");
     }
 
-    case "undoLastOrganization": {
-      const snapshot = await getLastOperation();
-
-      if (!snapshot) {
-        throw new Error("Nothing to undo yet.");
-      }
-
-      await emitProgress({
-        phase: "undoing_plan",
-        message: "Restoring the most recent tab layout snapshot..."
-      });
-      const result = await undoLastOrganization(snapshot);
-      await clearLastOperation();
-      await emitProgress({
-        phase: "complete",
-        message: result.warnings[0] ?? "Undo finished."
-      });
-      return result;
-    }
+    await emitProgress({
+      phase: "undoing_plan",
+      message: "Restoring the most recent tab layout snapshot..."
+    });
+    const result = await undoLastOrganization(snapshot);
+    await clearLastOperation();
+    await emitProgress({
+      phase: "complete",
+      message: result.warnings[0] ?? "Undo finished.",
+      warnings: result.warnings
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown extension error.";
+    await emitProgress({
+      phase: "error",
+      message,
+      error: message
+    });
   }
 }
 
@@ -157,31 +183,37 @@ async function runGenerateOrganizationPlan(
       onClusteringTabs: (update) =>
         emitProgress({
           phase: "clustering_tabs",
+          runId,
           ...update
         }),
       onPlanningBatches: (update) =>
         emitProgress({
           phase: "planning_batches",
+          runId,
           ...update
         }),
       onRequestingModel: (update) =>
         emitProgress({
           phase: "requesting_model",
+          runId,
           ...update
         }),
       onWaitingForModel: (update) =>
         emitProgress({
           phase: "waiting_for_model",
+          runId,
           ...update
         }),
       onParsingResponse: (update) =>
         emitProgress({
           phase: "parsing_response",
+          runId,
           ...update
         }),
       onValidatingPlan: (update) =>
         emitProgress({
           phase: "validating_plan",
+          runId,
           ...update
         })
     });
@@ -208,6 +240,12 @@ async function runGenerateOrganizationPlan(
   }
 }
 
+// Keep the service worker alive while the side panel is open.
+// Chrome MV3 suspends workers after ~30s of inactivity; a connected Port prevents that.
+chrome.runtime.onConnect.addListener((_port) => {
+  // Nothing to do — the open port itself keeps the worker alive.
+});
+
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -215,10 +253,24 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.runtime.onMessage.addListener((request: BackgroundRequest, _sender, sendResponse) => {
+  // Fire-and-forget handlers: respond immediately so the message channel closes
+  // before the service worker can be suspended by Chrome mid-operation.
   if (request.type === "generateOrganizationPlan") {
     const runId = crypto.randomUUID();
     sendResponse({ ok: true, data: { runId } } as BackgroundResponse<{ runId: string }>);
     void runGenerateOrganizationPlan(request, runId);
+    return false;
+  }
+
+  if (request.type === "applyOrganizationPlan") {
+    sendResponse({ ok: true, data: {} } as BackgroundResponse<unknown>);
+    void runApplyOrganizationPlan(request);
+    return false;
+  }
+
+  if (request.type === "undoLastOrganization") {
+    sendResponse({ ok: true, data: {} } as BackgroundResponse<unknown>);
+    void runUndoLastOrganization();
     return false;
   }
 
@@ -227,12 +279,10 @@ chrome.runtime.onMessage.addListener((request: BackgroundRequest, _sender, sendR
       sendResponse({ ok: true, data } satisfies BackgroundResponse<unknown>);
     })
     .catch(async (error) => {
-      if (request.type !== "generateOrganizationPlan") {
-        await emitProgress({
-          phase: "error",
-          message: error instanceof Error ? error.message : "Unknown extension error."
-        });
-      }
+      await emitProgress({
+        phase: "error",
+        message: error instanceof Error ? error.message : "Unknown extension error."
+      });
       sendResponse({
         ok: false,
         error: error instanceof Error ? error.message : "Unknown extension error."
